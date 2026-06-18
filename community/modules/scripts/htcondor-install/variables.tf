@@ -27,7 +27,7 @@ variable "condor_version" {
 
   validation {
     error_message = "var.condor_version must be set to \"23.*\" for latest 23.0 release or to a specific \"23.0.y\" release."
-    condition = var.condor_version == "23.*" || (
+    condition = var.condor_version == "23.*" || var.condor_version == "25.*" || (
       length(split(".", var.condor_version)) == 3 && alltrue([
         for v in split(".", var.condor_version) : can(tonumber(v))
       ]) && split(".", var.condor_version)[0] == "23"
