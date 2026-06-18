@@ -148,6 +148,7 @@ limitations under the License.
 | <a name="input_subnetwork_self_link"></a> [subnetwork\_self\_link](#input\_subnetwork\_self\_link) | The self link of the subnetwork in which the HTCondor central manager will be created. | `string` | `null` | no |
 | <a name="input_update_policy"></a> [update\_policy](#input\_update\_policy) | Replacement policy for Central Manager ("PROACTIVE" to replace immediately or "OPPORTUNISTIC" to replace upon instance power cycle). | `string` | `"PROACTIVE"` | no |
 | <a name="input_zones"></a> [zones](#input\_zones) | Zone(s) in which central manager may be created. If not supplied, will default to all zones in var.region. | `list(string)` | `[]` | no |
+| <a name="input_enable_public_ips"></a> [enable\_public\_ips](#input\_enable\_public\_ips) | Enable Public IPs on the access points | `bool` | `false` | no |
 
 ## Outputs
 

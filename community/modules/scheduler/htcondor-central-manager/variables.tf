@@ -160,6 +160,12 @@ variable "htcondor_bucket_name" {
   type        = string
 }
 
+variable "enable_public_ips" {
+  description = "Enable Public IPs on the access points"
+  type        = bool
+  default     = true
+}
+
 variable "enable_shielded_vm" {
   type        = bool
   default     = false
