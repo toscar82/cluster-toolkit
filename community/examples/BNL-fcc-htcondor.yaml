@@ -82,7 +82,7 @@ deployment_groups:
     use:
     - htcondor_service_accounts
 
-  - id: htcondor_cm
+  - id: fcchtcondor_cm
     source: community/modules/scheduler/htcondor-central-manager
     use:
     - network1
@@ -90,7 +90,6 @@ deployment_groups:
     - htcondor_service_accounts
     - htcondor_setup
     settings:
-      name_prefix: fcchtc-cm
       instance_image: $(vars.new_image)
       #      enable_public_ips: true
       # enable_high_availability: true
@@ -107,7 +106,7 @@ deployment_groups:
     - htcondor_secrets
     - htcondor_service_accounts
     - htcondor_setup
-    - htcondor_cm
+    - fcchtcondor_cm
     settings:
       name_prefix: fcchtc-ep
       instance_image: $(vars.new_image)
@@ -122,7 +121,7 @@ deployment_groups:
     - htcondor_secrets
     - htcondor_service_accounts
     - htcondor_setup
-    - htcondor_cm
+    - fcchtcondor_cm
     settings:
       name_prefix: fcchtc-epspot
       instance_image: $(vars.new_image)
@@ -137,7 +136,7 @@ deployment_groups:
 #    - htcondor_secrets
 #    - htcondor_service_accounts
 #    - htcondor_setup
-#    - htcondor_cm
+#    - fcchtcondor_cm
 #    - htcondor_execute_point
 #    - htcondor_execute_point_spot
 #    settings:
