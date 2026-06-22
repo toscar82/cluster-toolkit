@@ -528,15 +528,14 @@ variable "reservation_name" {
 
     Formats:
     - Local Reservation: For reservations in the same project as the cluster (var.project_id), the name is sufficient:
-      RESERVATION_NAME[/reservationBlocks/BLOCK_ID[/reservationSubBlocks/SUBBLOCK_ID]]
+      RESERVATION_NAME[/reservationBlocks/BLOCK_ID]
     - Shared Reservation: For reservations shared from a different project, the full resource path is required:
-      projects/HOST_PROJECT_ID/reservations/RESERVATION_NAME[/reservationBlocks/BLOCK_ID[/reservationSubBlocks/SUBBLOCK_ID]]
+      projects/HOST_PROJECT_ID/reservations/RESERVATION_NAME[/reservationBlocks/BLOCK_ID]
 
     Where:
     - HOST_PROJECT_ID: Project ID where the shared reservation was created.
     - RESERVATION_NAME: The name assigned to the specific reservation.
     - BLOCK_ID (Optional): The identifier for a specific reservation block, if the reservation is composed of multiple blocks.
-    - SUBBLOCK_ID (Optional): The identifier for a specific reservation subblock within a block.
 
     Note: Using a shared reservation ideally requires the 'compute.reservations.get' permission for the node service account in the host project; without it, full details cannot be fetched, but deployment will still proceed with defaults.
   EOD
@@ -545,8 +544,8 @@ variable "reservation_name" {
   nullable    = false
 
   validation {
-    condition     = length(regexall("^((projects/([a-z0-9-]+)/reservations/)?([a-z0-9-]+)(/reservationBlocks/[a-z0-9-]+(/reservationSubBlocks/[a-z0-9-]+)?)?)?$", var.reservation_name)) > 0
-    error_message = "Reservation name must be either empty or in the format '[projects/PROJECT_ID/reservations/]RESERVATION_NAME[/reservationBlocks/BLOCK_ID[/reservationSubBlocks/SUBBLOCK_ID]]', [...] are optional parts."
+    condition     = length(regexall("^((projects/([a-z0-9-]+)/reservations/)?([a-z0-9-]+)(/reservationBlocks/[a-z0-9-]+)?)?$", var.reservation_name)) > 0
+    error_message = "Reservation name must be either empty or in the format '[projects/PROJECT_ID/reservations/]RESERVATION_NAME[/reservationBlocks/BLOCK_ID]', [...] are optional parts."
   }
 }
 
@@ -631,8 +630,8 @@ variable "dws_flex" {
   - use_bulk_insert: Uses the legacy implementation of DWS Flex Start with Bulk Insert for non-accelerator instances
 
  Limitations:
-  - CAN NOT be used with reservations.
-
+  - CAN NOT be used with reservations;
+  - CAN NOT be used with placement groups;
 
  EOD
 

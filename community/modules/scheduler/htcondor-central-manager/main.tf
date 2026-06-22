@@ -216,12 +216,6 @@ module "htcondor_cm" {
     type                         = var.update_policy
   }]
 
-  stateful_ips = [{
-    interface_name = "nic0"
-    delete_rule    = "ON_PERMANENT_INSTANCE_DELETION"
-    is_external    = true
-  }]
-
   # the timeouts below are default for resource
   wait_for_instances = true
   mig_timeouts = {

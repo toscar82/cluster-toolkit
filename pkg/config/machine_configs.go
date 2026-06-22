@@ -110,18 +110,21 @@ func ParseTPUCount(machineType string) int {
 
 // ResolveAcceleratorInfo returns the number and type of accelerators for a given machine type.
 func ResolveAcceleratorInfo(mt *compute.MachineType, machineType string) (count int, accelType string, isTPU bool) {
-	isTPU = IsTPU(machineType)
+	isTPU = strings.HasPrefix(machineType, "ct") || strings.HasPrefix(machineType, "tpu")
 
 	if len(mt.Accelerators) > 0 {
 		acc := mt.Accelerators[0]
-		return int(acc.GuestAcceleratorCount), acc.GuestAcceleratorType, isTPU
+		if isTPU || strings.Contains(strings.ToLower(acc.GuestAcceleratorType), "tpu") {
+			return int(acc.GuestAcceleratorCount), "tpu", true
+		}
+		return int(acc.GuestAcceleratorCount), acc.GuestAcceleratorType, false
 	}
 
 	if count := ParseTPUCount(machineType); count > 0 {
-		return count, "tpu", isTPU
+		return count, "tpu", true
 	}
 
-	return 0, "", isTPU
+	return 0, "", false
 }
 
 // GetMachineType fetches machine type information from GCP Compute API with caching.
@@ -154,92 +157,70 @@ func GetMachineType(project, zone, machineType string) (*compute.MachineType, er
 	return res, nil
 }
 
-// GetOutputConfig returns the machine configuration as a struct.
-func GetOutputConfig(m *Module, bp Blueprint) (*OutputConfig, error) {
-	if mockData := os.Getenv("GHPC_MOCK_MACHINE_CONFIG"); mockData != "" {
-		var data OutputConfig
-		if err := json.Unmarshal([]byte(mockData), &data); err != nil {
-			return nil, err
-		}
-		return &data, nil
-	}
-
-	machineType, zone, project := extractMachineParams(m, bp)
-
-	if machineType == "" || zone == "" || project == "" {
-		return &OutputConfig{
-			GPUs: make(map[string]GPUConfig),
-			TPUs: make(map[string]TPUConfig),
-			CPUs: make(map[string]CPUConfig),
-		}, nil
-	}
-
-	mt, err := GetMachineType(project, zone, machineType)
-	if err != nil {
-		return nil, err
-	}
-
-	result := buildOutputConfigStruct(machineType, mt)
-	return &result, nil
-}
-
 func getMachineConfigJSON(m *Module, bp Blueprint) (string, error) {
 	if mockData := os.Getenv("GHPC_MOCK_MACHINE_CONFIG"); mockData != "" {
 		return mockData, nil
 	}
 
-	cfg, err := GetOutputConfig(m, bp)
+	machineType, zone, project := extractMachineParams(m, bp)
+
+	if machineType == "" || zone == "" || project == "" {
+		return `{"gpus": {}, "tpus": {}, "cpus": {}}`, nil
+	}
+
+	mt, err := GetMachineType(project, zone, machineType)
 	if err != nil {
 		return "", err
 	}
 
-	resBytes, err := json.Marshal(cfg)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal machine config object to JSON: %w", err)
-	}
-
-	return string(resBytes), nil
+	return buildOutputConfigJSON(machineType, mt)
 }
 
-type GPUConfig struct {
+type gpuConfig struct {
 	Count int    `json:"count"`
 	Type  string `json:"type"`
 }
-type TPUConfig struct {
+type tpuConfig struct {
 	Count int `json:"count"`
 }
-type CPUConfig struct {
+type cpuConfig struct {
 	Count    int `json:"count"`
 	MemoryMb int `json:"memoryMb,omitempty"`
 }
-type OutputConfig struct {
-	GPUs map[string]GPUConfig `json:"gpus"`
-	TPUs map[string]TPUConfig `json:"tpus"`
-	CPUs map[string]CPUConfig `json:"cpus"`
+
+type outputConfig struct {
+	GPUs map[string]gpuConfig `json:"gpus"`
+	TPUs map[string]tpuConfig `json:"tpus"`
+	CPUs map[string]cpuConfig `json:"cpus"`
 }
 
-func buildOutputConfigStruct(machineType string, mt *compute.MachineType) OutputConfig {
-	result := OutputConfig{
-		GPUs: make(map[string]GPUConfig),
-		TPUs: make(map[string]TPUConfig),
-		CPUs: make(map[string]CPUConfig),
+func buildOutputConfigJSON(machineType string, mt *compute.MachineType) (string, error) {
+	result := outputConfig{
+		GPUs: make(map[string]gpuConfig),
+		TPUs: make(map[string]tpuConfig),
+		CPUs: make(map[string]cpuConfig),
 	}
 
-	result.CPUs[machineType] = CPUConfig{Count: int(mt.GuestCpus), MemoryMb: int(mt.MemoryMb)}
+	result.CPUs[machineType] = cpuConfig{Count: int(mt.GuestCpus), MemoryMb: int(mt.MemoryMb)}
 
 	count, accelType, isTPU := ResolveAcceleratorInfo(mt, machineType)
 	if count > 0 {
 		if isTPU {
-			result.TPUs[machineType] = TPUConfig{Count: count}
+			result.TPUs[machineType] = tpuConfig{Count: count}
 		} else {
-			result.GPUs[machineType] = GPUConfig{
+			result.GPUs[machineType] = gpuConfig{
 				Count: count,
 				Type:  accelType,
 			}
 		}
 	}
 
-	return result
+	resBytes, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal machine config object to JSON: %w", err)
+	}
+
+	return string(resBytes), nil
 }
 
 // ClearMachineTypeCache clears the machine type cache. Used for testing.

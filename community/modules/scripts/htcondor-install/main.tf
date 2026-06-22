@@ -18,7 +18,7 @@ locals {
   runners = [
     {
       "type"        = "ansible-local"
-      "source"      = "${path.module}/files/install-htcondor25.yaml"
+      "source"      = "${path.module}/files/install-htcondor.yaml"
       "destination" = "install-htcondor.yaml"
       "args" = join(" ", [
         "-e enable_docker=${var.enable_docker}",

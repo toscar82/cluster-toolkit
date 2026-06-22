@@ -12,7 +12,7 @@ AuthType=auth/{auth_key}
 AuthAltTypes=auth/jwt
 AuthAltParameters=jwt_key={state_save}/jwt_hs256.key
 
-{dbd_host_str}
+DbdHost={control_host}
 
 LogFile={slurmlog}/slurmdbd.log
 

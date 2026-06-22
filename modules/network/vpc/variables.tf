@@ -329,9 +329,3 @@ variable "subnetwork_ipv6_access_type" {
   type        = string
   default     = null
 }
-
-variable "nic_type" {
-  description = "The NIC type to use for GKE additional networks output"
-  type        = string
-  default     = "GVNIC"
-}

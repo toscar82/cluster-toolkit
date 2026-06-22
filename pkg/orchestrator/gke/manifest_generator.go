@@ -117,7 +117,6 @@ func (g *GKEOrchestrator) PrepareManifestOptions(job orchestrator.JobDefinition,
 		NodeAffinityLabels: job.NodeConstraint,
 		Topology:           job.Topology,
 		Scheduler:          job.GKEScheduler,
-		IsDynamicSlicing:   isDynamicSlicing,
 	}
 
 	parts := strings.Split(originalAccelType, "-")
@@ -187,7 +186,7 @@ func (g *GKEOrchestrator) fillManifestStrings(opts *ManifestOptions, schedOpts S
 		opts.ImagePullSecrets = g.indentYaml(imagePullSecretsStr, 16)
 	}
 
-	opts.TopologyAnnotation = g.buildTopologyAnnotation(schedOpts.Topology, job.NumSlices, isDynamicSlicing)
+	opts.TopologyAnnotation = g.buildTopologyAnnotation(schedOpts.Topology)
 
 	tolerationsStr, err := g.resolveTolerations(job.MachineType)
 	if err != nil {

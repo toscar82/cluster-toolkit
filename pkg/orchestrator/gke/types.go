@@ -26,13 +26,6 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-const (
-	// tpuTopologyLabel is the GKE label for TPU topology.
-	tpuTopologyLabel = "cloud.google.com/gke-tpu-topology"
-	// nodePoolLabel is the GKE label for the node pool name.
-	nodePoolLabel = "cloud.google.com/gke-nodepool"
-)
-
 type Executor interface {
 	ExecuteCommand(name string, args ...string) shell.CommandResult
 	ExecuteCommandStream(name string, args ...string) error
@@ -212,7 +205,6 @@ type gkeNodePoolConfig struct {
 	Accelerators            []gkeAccelerator            `json:"accelerators"`
 	AdvancedMachineFeatures *gkeAdvancedMachineFeatures `json:"advancedMachineFeatures,omitempty"`
 	Taints                  []gkeTaint                  `json:"taints"`
-	Labels                  map[string]string           `json:"labels,omitempty"`
 }
 
 type gkeAutoscaling struct {

@@ -38,13 +38,10 @@ resource "helm_release" "apply_chart" {
     }
   }
 
-  # Implicit dependency anchor (only add if dependencies are provided)
-  dynamic "set" {
-    for_each = length(var.dependencies) > 0 ? [1] : []
-    content {
-      name  = "tf_dependency_anchor"
-      value = join(",", var.dependencies)
-    }
+  # Implicit dependency anchor
+  set {
+    name  = "tf_dependency_anchor"
+    value = join(",", var.dependencies)
   }
 
   # Installation/Upgrade Behavior

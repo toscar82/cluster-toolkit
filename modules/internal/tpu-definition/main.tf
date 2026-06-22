@@ -16,11 +16,7 @@
 
 locals {
   # Load shared JSON
-  tpu_accelerators = try(
-    jsondecode(var.machine_configs).tpus,
-    var.machine_configs.tpus,
-    {}
-  )
+  accelerators_json = try(jsondecode(var.machine_configs), var.machine_configs)
 
   # Determine if this is a TPU node pool by checking if the machine_type exists in our authoritative map of TPU machine types.
   is_tpu = contains(keys(local.tpu_chip_count_map), var.machine_type)
@@ -42,9 +38,8 @@ locals {
 
   # Project shared JSON into the expected format for tpu_chip_count_map (machine_type -> count)
   tpu_chip_count_map = {
-    for k, v in local.tpu_accelerators : k => v.count
+    for k, v in try(local.accelerators_json.tpus, {}) : k => v.count
   }
-
 
   # Robustly extract the machine family prefix (e.g., "ct6e").
   tpu_machine_family   = local.is_tpu ? element(split("-", var.machine_type), 0) : ""
@@ -53,5 +48,5 @@ locals {
 }
 
 terraform {
-  required_version = ">= 1.12.2"
+  required_version = "= 1.12.2"
 }
