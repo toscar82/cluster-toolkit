@@ -38,7 +38,7 @@
     - oauth2client
     - google-api-python-client
     - absl-py
-    # - htcondor it is instaled with condor package
+    - htcondor
     ansible.builtin.pip:
       name: "{{ item }}"
       state: present  # rely on pip resolver to pick latest compatible releases
