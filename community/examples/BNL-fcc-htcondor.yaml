@@ -129,22 +129,23 @@ deployment_groups:
       allow_automatic_updates: false
       max_size: 20
 
-#  - id: htcondor_access
-#    source: community/modules/scheduler/htcondor-access-point
-#    use:
-#    - network1
-#    - htcondor_secrets
-#    - htcondor_service_accounts
-#    - htcondor_setup
-#    - fcchtcondor_cm
-#    - htcondor_execute_point
-#    - htcondor_execute_point_spot
-#    settings:
-#      default_mig_id: $(htcondor_execute_point.mig_id)
-#      enable_public_ips: true
-#      instance_image: $(vars.new_image)
-#      enable_high_availability: true
-#      spool_disk_size_gb: 200 # required for regional HA
-#    outputs:
-#    - access_point_ips
-#    - access_point_name
+  - id: htcondor_access
+    source: community/modules/scheduler/htcondor-access-point
+    use:
+    - network1
+    - htcondor_secrets
+    - htcondor_service_accounts
+    - htcondor_setup
+    - fcchtcondor_cm
+    - htcondor_execute_point
+    - htcondor_execute_point_spot
+    settings:
+      machine_type: n2-standard-2
+      default_mig_id: $(htcondor_execute_point.mig_id)
+      enable_public_ips: false
+      instance_image: $(vars.new_image)
+      enable_high_availability: false
+      spool_disk_size_gb: 200 # required for regional HA
+    outputs:
+    - access_point_ips
+    - access_point_name

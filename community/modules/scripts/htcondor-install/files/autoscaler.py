@@ -30,8 +30,8 @@ import argparse
 import os
 import math
 import time
-import htcondor
-import classad
+import htcondor2 as htcondor
+import classad2 as classad
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--p", required=True, help="Project id", type=str)
