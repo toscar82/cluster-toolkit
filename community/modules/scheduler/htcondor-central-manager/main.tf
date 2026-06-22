@@ -173,6 +173,8 @@ module "central_manager_instance_template" {
   shielded_instance_config = var.shielded_instance_config
 
   network_ip = google_compute_address.cm.id
+
+  tags = var.network_tags
 }
 
 module "htcondor_cm" {

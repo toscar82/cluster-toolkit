@@ -91,6 +91,7 @@ deployment_groups:
     - htcondor_setup
     settings:
       instance_image: $(vars.new_image)
+      network_tags: ["fcccondorcm"]
       #      enable_public_ips: true
       # enable_high_availability: true
     outputs:
@@ -149,3 +150,21 @@ deployment_groups:
     outputs:
     - access_point_ips
     - access_point_name
+
+  - id: firewall_rule
+    source: modules/network/firewall-rules
+    use:
+    - network1
+    settings:
+      ingress_rules:
+      - name: $(vars.deployment_name)-allow-htcondor
+        description: Allow htcondor traffic
+        target_tags:
+        - fcccondorcm
+        source_ranges:
+        - 130.199.48.0/24
+        - 130.199.185.0/24
+        allow:
+        - protocol: tcp
+          ports:
+          - 9618,9665
