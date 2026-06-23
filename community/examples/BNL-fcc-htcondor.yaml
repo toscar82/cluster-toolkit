@@ -97,6 +97,10 @@ deployment_groups:
       custom_lines:
       - FLOCK_FROM = 130.199.48.164
       - SEC_DEFAULT_AUTHENTICATION = optional
+      - SEC_DEFAULT_ENCRYPTION = optional
+      - SEC_DEFAULT_INTEGRITY = optional
+      - ALLOW_ADVERTISE_SCHEDD = *
+      - ALLOW_ADVERTISE_STARTD = *
     outputs:
     - central_manager_name
 
