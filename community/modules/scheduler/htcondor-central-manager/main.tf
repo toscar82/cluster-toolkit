@@ -36,7 +36,11 @@ locals {
 
   name_prefix = "${var.deployment_name}-cm"
 
-  cm_config = templatefile("${path.module}/templates/condor_config.tftpl", {})
+  base_config = templatefile("${path.module}/templates/condor_config.tftpl", {})  
+  # If the list is empty, join() returns an empty string "".
+  extra_lines = join("\n", var.custom_lines)
+  # Combine them. If extra_lines is empty, it just appends the single "\n"
+  cm_config = "${local.base_config}\n${local.extra_lines}"
 
   cm_object = "gs://${var.htcondor_bucket_name}/${google_storage_bucket_object.cm_config.output_name}"
   schedd_runner = {

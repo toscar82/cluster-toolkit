@@ -202,3 +202,9 @@ variable "network_tags" {
   description = "Network tags, provided as a list"
   default     = []
 }
+
+variable "custom_lines" {
+  type        = list(string)
+  description = "Additional lines to append to the Condor config"
+  default     = []
+}

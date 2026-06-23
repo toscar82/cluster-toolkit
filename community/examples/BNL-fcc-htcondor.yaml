@@ -94,6 +94,9 @@ deployment_groups:
       network_tags: ["fcccondorcm"]
       #      enable_public_ips: true
       # enable_high_availability: true
+      custom_lines:
+      - FLOCK_FROM = 130.199.48.164
+      - SEC_DEFAULT_AUTHENTICATION = optional
     outputs:
     - central_manager_name
 
