@@ -167,4 +167,5 @@ deployment_groups:
         allow:
         - protocol: tcp
           ports:
-          - 9618,9665
+          - 9618
+          - 9665
