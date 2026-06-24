@@ -264,3 +264,9 @@ variable "update_policy" {
     error_message = "Allowed string values for var.update_policy are \"PROACTIVE\" or \"OPPORTUNISTIC\"."
   }
 }
+
+variable "network_tags" {
+  type        = list(string)
+  description = "Network tags, provided as a list"
+  default     = []
+}

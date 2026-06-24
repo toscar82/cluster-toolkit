@@ -275,6 +275,8 @@ module "access_point_instance_template" {
       device_name = local.spool_disk_device_name
     }
   ]
+
+  tags = var.network_tags
 }
 
 module "htcondor_ap" {

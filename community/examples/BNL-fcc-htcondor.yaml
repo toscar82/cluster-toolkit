@@ -150,10 +150,11 @@ deployment_groups:
     settings:
       machine_type: n2-standard-2
       default_mig_id: $(htcondor_execute_point.mig_id)
-      enable_public_ips: false
+      enable_public_ips: true
       instance_image: $(vars.new_image)
       enable_high_availability: false
       spool_disk_size_gb: 200 # required for regional HA
+      network_tags: ["fcccondorap"]
     outputs:
     - access_point_ips
     - access_point_name
@@ -168,6 +169,25 @@ deployment_groups:
         description: Allow htcondor traffic
         target_tags:
         - fcccondorcm
+        source_ranges:
+        - 130.199.48.0/24
+        - 130.199.185.0/24
+        allow:
+        - protocol: tcp
+          ports:
+          - 9618
+          - 9665
+
+  - id: firewall_rule_ap
+    source: modules/network/firewall-rules
+    use:
+    - network1
+    settings:
+      ingress_rules:
+      - name: $(vars.deployment_name)-allow-htcondor
+        description: Allow htcondor traffic
+        target_tags:
+        - fcccondorap
         source_ranges:
         - 130.199.48.0/24
         - 130.199.185.0/24
