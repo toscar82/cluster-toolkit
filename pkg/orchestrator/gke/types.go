@@ -46,6 +46,7 @@ type KubeClient interface {
 	ListWorkloads(namespace string, workloadName string) ([]string, error)
 	DeleteJobSet(namespace string, name string) error
 	ListJobSets(labelSelector string) ([]orchestrator.JobStatus, error)
+	GetCurrentNamespace() (string, error)
 }
 
 type MachineTypeClient interface {
@@ -84,6 +85,8 @@ type GKEOrchestrator struct {
 	dynamicSlicingCache         map[string]bool
 	staticSlicingCache          map[string]bool
 	topologyCache               map[string]string
+	slicingTopologiesChecked    bool
+	slicingTopologiesDetected   bool
 }
 
 // Types for GetClusterInfo unmarshaling
@@ -176,6 +179,9 @@ type ManifestOptions struct {
 	IsStaticSlicing               bool
 	IsCPUMachine                  bool
 	Pathways                      orchestrator.PathwaysJobDefinition
+	IsPathwaysJob                 bool
+	GKEMTCEnabled                 bool
+	GKEMTCRamdiskDirectory        string
 	Verbose                       bool
 	Env                           map[string]string
 	AdditionalManifests           []string
@@ -196,6 +202,7 @@ type MountInfo struct {
 	MountPath string
 	Type      string
 	ReadOnly  bool
+	Options   string
 }
 
 type FlavorCapacity struct {
@@ -273,9 +280,27 @@ type gkeClusterAutoscaling struct {
 }
 
 type gkeCluster struct {
-	Locations   []string              `json:"locations"`
-	NodePools   []gkeJobNodePool      `json:"nodePools"`
-	Autoscaling gkeClusterAutoscaling `json:"autoscaling"`
+	Locations                   []string                     `json:"locations"`
+	NodePools                   []gkeJobNodePool             `json:"nodePools"`
+	Autoscaling                 gkeClusterAutoscaling        `json:"autoscaling"`
+	ControlPlaneEndpointsConfig *controlPlaneEndpointsConfig `json:"controlPlaneEndpointsConfig,omitempty"`
+	AddonsConfig                *gkeAddonsConfig             `json:"addonsConfig,omitempty"`
+}
+
+type gkeAddonsConfig struct {
+	HighScaleCheckpointingConfig *gkeHighScaleCheckpointingConfig `json:"highScaleCheckpointingConfig,omitempty"`
+}
+
+type gkeHighScaleCheckpointingConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
+type controlPlaneEndpointsConfig struct {
+	DnsEndpointConfig *dnsEndpointConfig `json:"dnsEndpointConfig,omitempty"`
+}
+
+type dnsEndpointConfig struct {
+	AllowExternalTraffic bool `json:"allowExternalTraffic,omitempty"`
 }
 
 // Types for JobSet status unmarshaling
@@ -350,4 +375,79 @@ type jobSetTemplateData struct {
 	PathwaysWorkerEnv             []EnvVar
 	IsTPU                         bool
 	IsGPU                         bool
+	GKEMTCEnabled                 bool
+	GKEMTCRamdiskDirectory        string
+}
+
+// Types for parsing kubectl get nodes -o json
+
+type kubernetesNodeList struct {
+	Items []kubernetesNode `json:"items"`
+}
+
+type kubernetesNode struct {
+	Metadata kubernetesNodeMetadata `json:"metadata"`
+	Status   kubernetesNodeStatus   `json:"status"`
+}
+
+type kubernetesNodeMetadata struct {
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels"`
+}
+
+type kubernetesNodeStatus struct {
+	Conditions []kubernetesNodeCondition `json:"conditions"`
+}
+
+type kubernetesNodeCondition struct {
+	Type   string `json:"type"`
+	Status string `json:"status"`
+}
+
+type kueueWorkloadCondition struct {
+	Type               string `json:"type"`
+	Status             string `json:"status"`
+	Message            string `json:"message"`
+	LastTransitionTime string `json:"lastTransitionTime"`
+}
+
+type kueueWorkloadPodSet struct {
+	Count int `json:"count"`
+}
+
+type kueueWorkloadOwnerRef struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+type kueueWorkload struct {
+	Metadata struct {
+		Name              string                  `json:"name"`
+		Namespace         string                  `json:"namespace"`
+		CreationTimestamp string                  `json:"creationTimestamp"`
+		OwnerReferences   []kueueWorkloadOwnerRef `json:"ownerReferences"`
+	} `json:"metadata"`
+	Spec struct {
+		PriorityClassName string                `json:"priorityClassName"`
+		PodSets           []kueueWorkloadPodSet `json:"podSets"`
+	} `json:"spec"`
+	Status struct {
+		Admission *struct {
+			PodSetAssignments []kueueWorkloadPodSet `json:"podSetAssignments"`
+		} `json:"admission"`
+		ReclaimablePods []kueueWorkloadPodSet    `json:"reclaimablePods"`
+		Conditions      []kueueWorkloadCondition `json:"conditions"`
+	} `json:"status"`
+}
+
+type kueueWorkloadList struct {
+	Items []kueueWorkload `json:"items"`
+}
+
+// parsedReservation holds the extracted components of a GCE reservation URI/path.
+type parsedReservation struct {
+	Project  string
+	Name     string
+	Block    string
+	Subblock string
 }

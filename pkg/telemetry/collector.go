@@ -16,8 +16,8 @@ package telemetry
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"hpc-toolkit/pkg/config"
 	"hpc-toolkit/pkg/shell"
 	"net"
@@ -33,20 +33,10 @@ import (
 )
 
 var (
-	machineTypeSettings = []string{
-		"machine_type",                  // Usual setting for specifying machine type.
-		"node_type",                     // For modules that use node_type setting instead of machine_type to set machines.
-		"system_node_pool_machine_type", // For gke-cluster system node pools.
-	}
-	staticNodeCountSettings = []string{
-		"static_node_count", // Used in GKE node pool. If set, autoscaling will be disabled. Defaults to 0.
-		"node_count_static", // Standalone Slurm V6 CPU and TPU nodesets use 'node_count_static'. Defaults to 0.
-		"instance_count",    // VM instances and Batch login nodes use 'instance_count' to define static nodes. Default is 1.
-	}
-	staticNodeCountInlineKeys  = []string{"nodeset", "nodeset_tpu", "partition"} // Combine top-level explicit keys and complex inline object list keys for Slurm V6.
 	isGkeModulePatterns        = []string{"gke-node-pool", "gke-cluster"}
 	isSlurmModulePatterns      = []string{"schedmd-slurm-gcp-"}
 	isVmInstanceModulePatterns = []string{"vm-instance"}
+	testProjects               = []string{"hpc-toolkit-dev"}
 )
 
 // NewCollector creates and initializes a new Telemetry Collector.
@@ -67,6 +57,7 @@ func (c *Collector) CollectMetrics(errorCode int, err error) {
 	defer c.mu.Unlock()
 
 	bpModulesList := getBpModulesList(c.blueprint)
+	projectID := config.GetKeyFromBlueprint("project_id", c.blueprint)
 
 	c.metadata[COMMAND_FLAGS] = getCmdFlags(c.eventCmd)
 	c.metadata[BLUEPRINT] = getBlueprintName(c.blueprint)
@@ -75,15 +66,20 @@ func (c *Collector) CollectMetrics(errorCode int, err error) {
 	c.metadata[IS_SLURM] = getIsSlurm(bpModulesList)
 	c.metadata[IS_VM_INSTANCE] = getIsVmInstance(bpModulesList)
 	c.metadata[MACHINE_TYPE] = getMachineType(c.blueprint)
+	c.metadata[MACHINE_CATEGORY] = getMachineCategory(c.blueprint)
+	c.metadata[STORAGE_TYPE] = getStorageType(c.blueprint)
 	c.metadata[REGION] = getRegion(c.blueprint)
 	c.metadata[ZONE] = getZone(c.blueprint)
 	c.metadata[MODULES] = getModules(bpModulesList)
 	c.metadata[STATIC_NODE_COUNTS] = getStaticNodeCounts(c.blueprint)
+	c.metadata[DYNAMIC_MIN_NODE_COUNTS] = getDynamicNodeCounts(c.blueprint, "min")
+	c.metadata[DYNAMIC_MAX_NODE_COUNTS] = getDynamicNodeCounts(c.blueprint, "max")
 	c.metadata[OS_NAME] = getOSName()
 	c.metadata[OS_VERSION] = getOSVersion()
 	c.metadata[TERRAFORM_VERSION] = getTerraformVersion()
 	c.metadata[INSTALLATION_MODE] = c.installationMode
-	c.metadata[IS_TEST_DATA] = getIsTestData()
+	c.metadata[IS_AI_ASSISTED] = strconv.FormatBool(c.blueprint.AIAssisted)
+	c.metadata[IS_TEST_DATA] = getIsTestData(projectID)
 	c.metadata[EXIT_CODE] = strconv.Itoa(errorCode)
 	c.metadata[ERROR_TYPE] = getErrorType(err)
 }
@@ -93,16 +89,16 @@ func (c *Collector) BuildConcordEvent() ConcordEvent {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	project_id := config.GetKeyFromBlueprint("project_id", c.blueprint)
+	projectID := config.GetKeyFromBlueprint("project_id", c.blueprint)
 
 	return ConcordEvent{
 		ConsoleType:      CLUSTER_TOOLKIT,
 		EventType:        "gclusterCLI",
 		EventName:        getCommandName(c.eventCmd),
 		EventMetadata:    getEventMetadataKVPairs(c.metadata),
-		ProjectNumber:    getProjectNumber(project_id),
+		ProjectNumber:    getProjectNumber(projectID),
 		ClientInstallId:  getClientInstallId(),
-		BillingAccountId: getBillingAccountId(project_id),
+		BillingAccountId: getBillingAccountId(projectID),
 		ReleaseVersion:   getReleaseVersion(),
 		IsGoogler:        getIsGoogler(),
 		LatencyMs:        getLatencyMs(c.eventStartTime),
@@ -225,8 +221,7 @@ func getMachineType(bp config.Blueprint) string {
 	seen := make(map[string]bool) // To keep track of added machine types to avoid duplication
 
 	for _, m := range config.GetAllBpModules(&bp) {
-		var mType string
-		mType = getMachineTypeFromModule(m, bp)
+		var mType = getMachineTypeFromModule(m, bp)
 
 		if mType != "" && !seen[mType] {
 			machineTypes = append(machineTypes, mType)
@@ -235,6 +230,39 @@ func getMachineType(bp config.Blueprint) string {
 	}
 
 	return strings.Join(machineTypes, ",")
+}
+
+func getMachineCategory(bp config.Blueprint) string {
+	machineTypes := getMachineType(bp)
+	if machineTypes == "" {
+		return ""
+	}
+
+	machineTypesList := strings.Split(machineTypes, ",")
+	categories := make([]string, 0, len(machineTypesList))
+	for _, mt := range machineTypesList {
+		categories = append(categories, fmt.Sprintf("%s:%s", mt, detectMachineCategory(mt)))
+	}
+
+	return strings.Join(categories, ",")
+}
+
+func getStorageType(bp config.Blueprint) string {
+	var storageTypes []string
+	seen := make(map[string]bool)
+
+	for _, m := range config.GetAllBpModules(&bp) {
+		types := getStorageTypesFromModule(m, bp)
+		for _, t := range types {
+			if !seen[t] {
+				storageTypes = append(storageTypes, t)
+				seen[t] = true
+			}
+		}
+	}
+
+	slices.Sort(storageTypes)
+	return strings.Join(storageTypes, ",")
 }
 
 func getRegion(bp config.Blueprint) string {
@@ -284,13 +312,54 @@ func getStaticNodeCounts(bp config.Blueprint) string {
 		}
 	}
 
-	counts, err := json.Marshal(countsByMachineType)
-	if err != nil || len(countsByMachineType) == 0 {
+	if len(countsByMachineType) == 0 {
 		return ""
 	}
 
-	// Trimming the curly braces safely extracts our exact format `"g4-standard-48":3,"a3-ultragpu-8g":2`
-	return strings.Trim(string(counts), "{}")
+	keys := make([]string, 0, len(countsByMachineType))
+	for k := range countsByMachineType {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	builder := make([]string, 0, len(keys))
+	for _, k := range keys {
+		builder = append(builder, fmt.Sprintf("%s:%d", k, countsByMachineType[k]))
+	}
+	return strings.Join(builder, ",")
+}
+
+func getDynamicNodeCounts(bp config.Blueprint, kind string) string {
+	counts := make(map[string]int)
+	targetKeys := dynamicMinNodeCountSettings
+	if kind == "max" {
+		targetKeys = dynamicMaxNodeCountSettings
+	}
+
+	for _, m := range config.GetAllBpModules(&bp) {
+		moduleCounts := getModuleDynamicNodeCounts(m, bp, targetKeys)
+		for mt, cnt := range moduleCounts {
+			if cnt > 0 {
+				counts[mt] += cnt
+			}
+		}
+	}
+
+	if len(counts) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(counts))
+	for k := range counts {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	builder := make([]string, 0, len(keys))
+	for _, k := range keys {
+		builder = append(builder, fmt.Sprintf("%s:%d", k, counts[k]))
+	}
+	return strings.Join(builder, ",")
 }
 
 func getOSName() string {
@@ -386,9 +455,12 @@ func getErrorType(err error) string {
 	return ErrTypeUnknown
 }
 
-// This method intentionally returns "true", as all telemetry is in testing phase currently.
-func getIsTestData() string {
-	return "true" // do not modify
+// This method returns "true" for test projects, and "false" otherwise.
+func getIsTestData(projectID string) string {
+	if slices.Contains(testProjects, projectID) {
+		return "true"
+	}
+	return "false"
 }
 
 func getLatencyMs(eventStartTime time.Time) int64 {

@@ -165,6 +165,10 @@ func (g *GKEOrchestrator) PrepareManifestOptions(job orchestrator.JobDefinition,
 		Topology:                      schedOpts.Topology,
 		Verbose:                       job.Verbose,
 		Env:                           job.Env,
+		IsPathwaysJob:                 job.IsPathwaysJob,
+		Pathways:                      job.Pathways,
+		GKEMTCEnabled:                 job.GKEMTCEnabled,
+		GKEMTCRamdiskDirectory:        job.GKEMTCRamdiskDirectory,
 	}
 
 	if err := g.fillManifestStrings(&opts, schedOpts, job, isDynamicSlicing, isStaticSlicing, profile.IsCPUMachine); err != nil {
@@ -226,11 +230,12 @@ func (g *GKEOrchestrator) fillManifestStrings(opts *ManifestOptions, schedOpts S
 
 func (g *GKEOrchestrator) resolveReservationTolerations(machineType, reservationName string) []corev1.Toleration {
 	var tolerations []corev1.Toleration
+	res := parseReservationURI(reservationName)
 	// Always add the standard GKE reservation toleration to support NAP where the node pool may not exist yet
 	tolerations = append(tolerations, corev1.Toleration{
 		Key:      "cloud.google.com/reservation-name",
 		Operator: corev1.TolerationOpEqual,
-		Value:    extractShortReservationName(reservationName),
+		Value:    res.Name,
 		Effect:   corev1.TaintEffectNoSchedule,
 	})
 
@@ -238,14 +243,15 @@ func (g *GKEOrchestrator) resolveReservationTolerations(machineType, reservation
 		"cloud.google.com/reservation-name": true,
 	}
 
-	shortResName := extractShortReservationName(reservationName)
+	shortResName := res.Name
 	for _, np := range g.clusterDesc.NodePools {
 		lblVal := np.Config.Labels["cloud.google.com/reservation-name"]
 		if lblVal == "" {
 			continue
 		}
-		if strings.EqualFold(np.Config.MachineType, machineType) && strings.EqualFold(extractShortReservationName(lblVal), shortResName) {
-			tolerations[0].Value = extractShortReservationName(lblVal)
+		parsedLbl := parseReservationURI(lblVal)
+		if strings.EqualFold(np.Config.MachineType, machineType) && parsedLbl.Name == shortResName {
+			tolerations[0].Value = parsedLbl.Name
 			for _, t := range np.Config.Taints {
 				// Avoid duplicate tolerations
 				if seenTaints[t.Key] {
